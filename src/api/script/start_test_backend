@@ -111,7 +111,7 @@ end
 
 puts 'Starting backend repserver...'
 reposrv = Thread.new do
-  reposrv_out = IO.popen("cd #{Rails.root}/tmp/backend_config; exec perl #{perlopts} ./bs_repserver 2>&1")
+  reposrv_out = IO.popen("cd #{Rails.root}/tmp/backend_config; exec perl #{perlopts} ./bs_repserver 2>&1 > bs_repserver.log")
   puts "Started backend repserver with pid #{reposrv_out.pid}"
   while reposrv_out && !dienow
     begin

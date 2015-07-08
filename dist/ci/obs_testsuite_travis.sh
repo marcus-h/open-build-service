@@ -23,7 +23,7 @@ cd src/api
 if test -z "$SUBTEST"; then
   export DO_COVERAGE=1
   export TESTOPTS="-v"
-  bundle exec rake test:api || cat tmp/backend_config/bs_srcserver.log && exit 1
+  bundle exec rake test:api || cat tmp/backend_config/bs_srcserver.log && echo "REPSERVER" && cat tmp/backend_config/bs_repserver.log && exit 1
   bundle exec rake test:webui
   cat coverage/.last_run.json
   ruby -rcoveralls -e 'Coveralls.push!'
