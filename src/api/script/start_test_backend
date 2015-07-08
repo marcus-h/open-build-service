@@ -96,7 +96,7 @@ end
 
 puts 'Starting backend srcserver...'
 srcsrv = Thread.new do
-  srcsrv_out = IO.popen("cd #{Rails.root}/tmp/backend_config; exec perl #{perlopts} ./bs_srcserver 2>&1")
+  srcsrv_out = IO.popen("cd #{Rails.root}/tmp/backend_config; exec perl #{perlopts} ./bs_srcserver 2>&1 > bs_srcserver.log")
   puts "Started backend srcserver with pid: #{srcsrv_out.pid}"
   while srcsrv_out && !dienow
     begin

@@ -43,6 +43,8 @@ case $SUBTEST in
    ;;
 esac
 
+# print srcserver log (just for testing)
+cat tmp/backend_config/bs_srcserver.log
 cd ../..
 cleanup
 exit $ret
