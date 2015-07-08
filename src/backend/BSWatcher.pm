@@ -741,9 +741,21 @@ sub rpc_recv_handler {
     return;
   }
   my $ans;
+  $ev->{'rpceof'} = 1 if !$r;
   $ans = $ev->{'recvbuf'};
+
+  if ($ev->{'_need'}) {
+    #shortcut for need more bytes...
+    if (!$ev->{'rpceof'} && length($ans) < $ev->{'_need'}) {
+      #printf "... %d/%d\n", length($ans), $ev->{'_need'};
+      BSEvents::add($ev);
+      return;
+    }
+    delete $ev->{'_need'};
+  }
+
   if ($ans !~ /\n\r?\n/s) {
-    if (!$r) {
+    if ($ev->{'rpceof'}) {
       rpc_error($ev, "EOF from $ev->{'rpcdest'}");
       return;
     }
@@ -798,10 +810,10 @@ sub rpc_recv_handler {
 
   my $cl = $headers{'content-length'};
   my $chunked = $headers{'transfer-encoding'} && lc($headers{'transfer-encoding'}) eq 'chunked' ? 1 : 0;
-  $ev->{'contentlength'} = $cl if !$chunked;
 
   if ($param->{'receiver'}) {
     #rpc_error($ev, "answer is neither chunked nor does it contain a content length\n") unless $chunked || defined($cl);
+    $ev->{'contentlength'} = $cl if !$chunked;
     if ($param->{'receiver'} == \&BSHTTP::file_receiver) {
       rpc_recv_file($ev, $chunked, $ans, $param->{'filename'}, $param->{'withmd5'});
     } elsif ($param->{'receiver'} == \&BSHTTP::cpio_receiver) {
@@ -821,7 +833,22 @@ sub rpc_recv_handler {
     }
     return;
   }
-  rpc_recv_non_receiver($ev, $chunked, $ans);
+
+  if ($chunked) {
+    rpc_recv_non_receiver($ev, $chunked, $ans);
+    return;
+  }
+  if ($ev->{'rpceof'} && $cl && length($ans) < $cl) {
+    rpc_error($ev, "EOF from $ev->{'rpcdest'}");
+    return;
+  }
+  if (!$ev->{'rpceof'} && (!defined($cl) || length($ans) < $cl)) {
+    $ev->{'_need'} = length($headers) + $cl if defined $cl;
+    BSEvents::add($ev);
+    return;
+  }
+  $ans = substr($ans, 0, $cl) if defined $cl;
+  rpc_result($ev, $ans);
 }
 
 sub rpc_send_handler {
