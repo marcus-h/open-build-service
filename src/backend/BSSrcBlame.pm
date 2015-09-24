@@ -16,7 +16,7 @@ sub diff3 {
     if (/^\t/ && defined($lines)) {
       $lines--;
     } elsif (/====(\d)?$/) {
-      die("illegal format: $_\n") if defined($lines) && $lines != 0;
+      die("illegal format: $_ (data expected)\n") if defined($lines) && $lines != 0;
       push @diff3, $diff3 if $diff3;
       $diff3 = {};
       $diff3->{'odd'} = $1 ? $1 - 1 : undef;
@@ -26,10 +26,10 @@ sub diff3 {
       my ($fno, $lo, $hi) = ($1 - 1, $2 - 1, (defined($3) ? $3 : $2) - 1);
       $diff3->{'data'}->[$fno] = [$lo, $hi, $4];
       $lines = $hi - $lo;
-      $lines++ if $lines || $4 =~ /c/;
+      $lines++ if $lines || $4 eq 'c';
       undef $lines if defined($diff3->{'odd'}) && $fno == ($diff3->{'odd'} == 0);
     } else {
-      die("illegal format: $_\n");
+      die("illegal format: $_\n") unless $_ eq '\ No newline at end of file';
     }
   }
   die("unexpected eof\n") if $lines;
@@ -53,20 +53,20 @@ sub merge {
   for my $diff3 (@diff3) {
     my ($low, $high, $type) = @{$diff3->{'data'}->[$FC]};
     my $lo = $low;
-    $lo-- if $type =~ /c/; # stop one line before the change starts
+    $lo-- if $type eq 'c'; # stop one line before the change starts
     while ($off <= $lo) {
       push @merge, [$FC, $off];
       $off++;
     }
     # the change affects high - low + 1 lines (inclusive)
-    $off += $high - $low + 1 if $type =~ /c/;
+    $off += $high - $low + 1 if $type eq 'c';
     my $odd = $diff3->{'odd'};
     # nothing todo, if common is the odd file and if the diff
     # block of my and common has the type "add" ("a") 
     # (note: since we have no conflicts, the diff block of
     # your and common also has the type "add" (that's why we
     # just check the type of the my ($FM) block))
-    next if $odd == $FC && $diff3->{'data'}->[$FM]->[2] =~ /a/;
+    next if $odd == $FC && $diff3->{'data'}->[$FM]->[2] eq 'a';
     # if common is the odd file, the my file and the your
     # file have the "same" diff - so we can either take the
     # information from the my file or from the your file.
