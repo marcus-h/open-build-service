@@ -14,7 +14,7 @@ use BSUtil;
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT_OK = qw(blame_is list_like commit branch create del);
+our @EXPORT_OK = qw(blame_is list_like commit branch create del list);
 
 ## test helpers
 
@@ -23,16 +23,19 @@ sub blame_is {
   my $code = delete $opts{'code'} || 200;
   die("'expected' option required\n") unless exists $opts{'expected'} || $code != 200;
   my $exp = delete $opts{'expected'};
+  my $res;
   eval {
 #    list($projid, $packid);
-    rpc("$BSConfig::srcserver/source/$projid/$packid/$filename");
+    $res = getfile($projid, $packid, $filename, 'expand' => 1, %opts);
   };
   if ($code && $code != 200) {
     like($@, qr/^$code/, $test_name);
     return;
   }
 #  is($projid, $exp, $test_name);
-  ok(1, $test_name);
+#  ok(1, $test_name);
+  $exp =~ s/^[^:]*: //gm;
+  is($res, $exp, $test_name);
 }
 
 sub list_like {
@@ -61,6 +64,11 @@ sub list {
   my $uri = "$BSConfig::srcserver/source/$projid";
   $uri .= "/$packid" if $packid;
   return rpc($uri, $BSXML::dir, @query);
+}
+
+sub getfile {
+  my ($projid, $packid, $filename, %opts) = @_;
+  return rpc("$BSConfig::srcserver/source/$projid/$packid/$filename", undef, hash2query(%opts));
 }
 
 sub putdata {

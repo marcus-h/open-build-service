@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 16;
+use Test::More tests => 28;
 
 use BSSrcBlame;
 
@@ -113,6 +113,43 @@ test_diff3("three-way diff of my, your and common",
     }
   ));
 
+test_diff3("three-way diff of my, your.noeol and common (your.noeol has no EOL)",
+  [fixture('my'), fixture('your.noeol'), fixture('common')],
+  (
+    {
+      'odd' => 0,
+      'data' => [
+        [1, 2, 'c'],
+        [1, 1, 'c'],
+        [1, 1, 'c']
+      ]
+    },
+    {
+      'odd' => 1,
+      'data' => [
+        [5, 6, 'c'],
+        [4, 5, 'c'],
+        [4, 5, 'c']
+      ]
+    },
+    {
+      'odd' => 0,
+      'data' => [
+        [8, 10, 'c'],
+        [7, 8, 'c'],
+        [7, 8, 'c']
+      ]
+    },
+    {
+      'odd' => 1,
+      'data' => [
+        [11, 11, 'a'],
+        [10, 12, 'c'],
+        [9, 9, 'a']
+      ]
+    }
+  ));
+
 test_diff3("empty three-way diff",
   [fixture('my'), fixture('my'), fixture('my')],
   ());
@@ -167,6 +204,27 @@ test_merge("my and /dev/null",
 
 test_merge("my, your and common",
   [fixture('my'), fixture('your'), fixture('common')],
+  (
+    [2, 0],
+    [0, 1],
+    [0, 2],
+    [2, 2],
+    [2, 3],
+    [1, 4],
+    [1, 5],
+    [2, 6],
+    [0, 8],
+    [0, 9],
+    [0, 10],
+    [2, 9],
+    [1, 10],
+    [1, 11],
+    [1, 12]
+  ));
+
+# same result as above
+test_merge("my, your.noeol and common (your.noeol has no EOL)",
+  [fixture('my'), fixture('your.noeol'), fixture('common')],
   (
     [2, 0],
     [0, 1],
@@ -371,6 +429,26 @@ test_merge("my2.change my2.change common2 (adds + deletes from the your file)",
     [1, 3],
     [1, 4],
     [2, 4]
+  ));
+
+test_merge("my3 your3 common3 (adds + deletes + changes)",
+  [fixture('my3'), fixture('your3'), fixture('common3')],
+  (
+    [0, 0],
+    [2, 1],
+    [1, 2],
+    [2, 3],
+    [2, 6],
+    [2, 7],
+    [0, 6],
+    [0, 7],
+    [2, 8],
+    [1, 7],
+    [1, 8],
+    [2, 9],
+    [0, 10],
+    [0, 11],
+    [2, 10]
   ));
 
 #test_merge("my2, your2 and common (my2 and your2 share a new line)",
