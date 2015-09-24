@@ -41,12 +41,12 @@ Section start:
 A line from the branch.
 Section end.
 EOF
-blame_is("branch at r1", "branch", "pkg3", "testfile", expected => <<EOF);
+blame_is("branch at r2", "branch", "pkg3", "testfile", expected => <<EOF);
 origin/opkg3/r1: This is a
 origin/opkg3/r1: simple text.
 origin/opkg3/r1: 
 origin/opkg3/r1: Section start:
-branch/pkg3/r1: A line from the branch.
+branch/pkg3/r2: A line from the branch.
 origin/opkg3/r1: Section end.
 EOF
 
@@ -65,7 +65,7 @@ origin/opkg3/r1: This is a
 origin/opkg3/r1: simple text.
 origin/opkg3/r1: 
 origin/opkg3/r1: Section start:
-branch/pkg3/r1: A line from the branch.
+branch/pkg3/r2: A line from the branch.
 origin/opkg3/r1: Section end.
 origin/opkg3/r2: 
 origin/opkg3/r2: This line does not cause a conflict.
@@ -105,14 +105,14 @@ list_like("check baserev and no conflict", "branch", "pkg3",
 
 # now the question is: which prj/pkg/rev introduced the
 #   "\nThis line does not cause a conflict."
-# lines? (either origin/opkg3/r2 or branch/pkg3/r2)
-blame_is("branch at r2 (resolved conflict)", "branch", "pkg3", "testfile", expected => <<EOF);
+# lines? (either origin/opkg3/r2 or branch/pkg3/r3)
+blame_is("branch at r3 (resolved conflict)", "branch", "pkg3", "testfile", expected => <<EOF);
 origin/opkg3/r4: This is a
 origin/opkg3/r4: simple text.
 origin/opkg3/r4: 
 origin/opkg3/r4: Section start:
-branch/pkg3/r2: Resolved:
-branch/pkg3/r1: A line from the branch.
+branch/pkg3/r3: Resolved:
+branch/pkg3/r2: A line from the branch.
 origin/opkg3/r4: A line from the origin.
 origin/opkg3/r4: Section end.
 origin/opkg3/r2: 
@@ -125,12 +125,12 @@ origin/opkg3/r4: This is a
 origin/opkg3/r4: simple text.
 origin/opkg3/r4: 
 origin/opkg3/r4: Section start:
-branch/pkg3/r2: Resolved:
-branch/pkg3/r1: A line from the branch.
+branch/pkg3/r3: Resolved:
+branch/pkg3/r2: A line from the branch.
 origin/opkg3/r4: A line from the origin.
 origin/opkg3/r4: Section end.
-branch/pkg3/r2: 
-branch/pkg3/r2: This line does not cause a conflict.
+branch/pkg3/r3: 
+branch/pkg3/r3: This line does not cause a conflict.
 EOF
 
 # note: it might be "confusing" that, for instance, the first four lines
