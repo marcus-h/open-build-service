@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 14;
+use Test::More tests => 17;
 
 use BSBlameTest qw(blame_is list_like create commit del branch);
 
@@ -28,6 +28,10 @@ This is
 the new file
 fileb.
 EOF
+list_like("origin/opkg2 is at r2", "origin", "opkg2",
+  xpath => '@rev = 2 and srcmd5 = "f5a596008989db5e881fcdade1781a6d"');
+list_like("check baserev at r1", "branch", "pkg2",
+  xpath => './linkinfo[@baserev = "cfc4c51c6700fe920459c6022af1c5b8"]');
 blame_is("branch at r1 (origin changed)", "branch", "pkg2", "fileb", expected => <<EOF);
 origin/opkg2/r2: This is
 origin/opkg2/r2: the new file
@@ -40,6 +44,8 @@ the
 modified file
 fileb.
 EOF
+list_like("check baserev at r2", "branch", "pkg2",
+  xpath => './linkinfo[@baserev = "f5a596008989db5e881fcdade1781a6d"]');
 blame_is("branch at r2 (fileb changed)", "branch", "pkg2", "fileb", expected => <<EOF);
 origin/opkg2/r2: This is
 branch/pkg2/r2: the
