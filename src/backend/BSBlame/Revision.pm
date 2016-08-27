@@ -13,16 +13,20 @@ use BSXML;
 our $getrev;
 
 sub new {
-  my ($class, $rev) = @_;
+  my ($class, $rev, $idx, $getrev) = @_;
   print "BSBlame::Revision::new\n";
-  bless {'data' => {'rev' => $rev}}, $class;
+  return bless {
+    'data' => {
+      'rev' => $rev,
+      'idx' => $idx,
+      'getrev' => $getrev
+    }
+  }, $class;
 }
 
 sub init {
   my ($self) = @_;
   return if $self->{'data'}->{'lsrcmd5'};
-  my $getrevimpl = $getrev if $getrev;
-  $getrevimpl = \&BSRevision::getrev_local;
   my $data = $self->{'data'};
   $data->{'lsrcmd5'} = $data->{'rev'}->{'srcmd5'};
   my %li;
@@ -31,9 +35,9 @@ sub init {
   if (%li) {
     $data->{'lsrcmd5'} = $li{'lsrcmd5'};
     $data->{'expanded'} = 1;
-    my $lrev = $getrevimpl->($data->{'rev'}->{'project'},
-                             $data->{'rev'}->{'package'},
-                             $data->{'lsrcmd5'});
+    my $lrev = $data->{'getrev'}->($data->{'rev'}->{'project'},
+                                   $data->{'rev'}->{'package'},
+                                   $data->{'lsrcmd5'});
     $files = BSSrcrep::lsrev($lrev);
     $l = BSSrcrep::repreadxml($lrev, '_link', $files->{'_link'},
                               $BSXML::link);
@@ -49,7 +53,7 @@ sub init {
   if ($l) {
     my $tprojid = $l->{'project'} || $data->{'rev'}->{'project'};
     my $tpackid = $l->{'package'} || $data->{'rev'}->{'package'};
-    my $trev = $getrevimpl->($tprojid, $tpackid, $tsrcmd5);
+    my $trev = $data->{'getrev'}->($tprojid, $tpackid, $tsrcmd5);
     $data->{'targetrev'} = BSBlame::Revision->new($trev);
   }
 }
@@ -73,7 +77,7 @@ sub isexpanded {
 sub isbranch {
   my ($self) = @_;
   $self->init();
-  return exists $self->{'data'}->{'branch'};
+  return $self->islink() && $self->{'data'}->{'branch'};
 }
 
 sub islink {
@@ -112,6 +116,24 @@ sub resolved {
   my ($self, $status) = @_;
   $self->{'data'}->{'resolved'} = 1 if $status;
   return $self->{'data'}->{'resolved'};
+}
+
+sub idx {
+  my ($self) = @_;
+  return $self->{'data'}->{'idx'};
+}
+
+sub satisfies {
+  my ($self, @constraints) = @_;
+  for (@constraints) {
+    return 0 unless $_->eval($self);
+  }
+  # only init if really needed
+  $self->init();
+  if ($self->resolved() && ($self->islink() || $self->isexpanded())) {
+    return $self->targetrev()->satifies(@constraints);
+  }
+  return 1;
 }
 
 1;

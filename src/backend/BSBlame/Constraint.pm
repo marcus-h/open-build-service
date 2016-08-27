@@ -6,14 +6,15 @@ use warnings;
 use Data::Dumper;
 
 my $opmap = {
-  '<' => sub { $_[0] + 0 < $_[1] + 0 },
-  '<=' => sub { $_[0] + 0 <= $_[1] + 0 },
-  '=' => sub { $_[0] eq $_[1] },
-  '>=' => sub { $_[0] + 0 >= $_[1] + 0 },
-  '>' => sub { $_[0] + 0 > $_[1] + 0 }
+  '<' => sub { !defined($_[0]) ? 1 : ($_[0] + 0 < $_[1] + 0) },
+  '<=' => sub { !defined($_[0]) ? 1 : ($_[0] + 0 <= $_[1] + 0) },
+  '=' => sub { !defined($_[0]) ? 1 : ($_[0] eq $_[1]) },
+  '>=' => sub { !defined($_[0]) ? 1 : ($_[0] + 0 >= $_[1] + 0) },
+  '>' => sub { !defined($_[0]) ? 1 : ($_[0] + 0 > $_[1] + 0) }
 };
 
-my $opre = join('|', map {"\Q$_\E"} keys(%$opmap));
+my $opre = join('|',
+                map {"\Q$_\E"} sort {length($b) <=> length($a)} keys(%$opmap));
 
 sub new {
   my ($class, $expr) = @_;
@@ -38,6 +39,8 @@ sub eval {
   die("unknown attribute $self->{'attr'}\n") unless $meth;
   return $opmap->{$self->{'op'}}->($rev->$meth(), $self->{'val'});
 }
+
+# needed? (only for constraint merging, contradiction checking etc.)
 
 sub attr {
   my ($self) = @_;
