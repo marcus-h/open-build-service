@@ -24,7 +24,6 @@ sub new {
 sub read {
   my ($self, $projid, $packid) = @_;
   my $key = "$projid/$packid";
-  print "#$key#\n";
   return $self->{'revs'}->{$key} if $self->{'revs'}->{$key};
   my $dbfn = "$self->{'projectsdir'}/$projid.pkg/$packid.rev";
   my @orevs = BSFileDB::fdb_getall($dbfn, $self->{'srcrevlay'});
@@ -61,7 +60,7 @@ sub iter {
 
 sub find {
   my ($self, $projid, $packid, $lsrcmd5, @constraints) = @_;
-  push @constraints, BSBlame::Constraint->new("lsrcmd5 = $lsrcmd5");
+  push @constraints, BSBlame::Constraint->new("lsrcmd5 = x$lsrcmd5", "project = branch");
   my $it = $self->iter($projid, $packid, @constraints);
   return $it->next();
 }
@@ -82,14 +81,12 @@ sub rangesplit {
   my ($self, $lrev) = @_;
   my $range = $self->range($lrev);
   my $revs = $self->read($lrev->project(), $lrev->package());
-  print "rangesplit: " . $lrev->idx() . "\n";
   my $oldend = $range->end($lrev->idx() - 1);
   my $newrange = BSBlame::Range->new($lrev->idx(), $revs);
   $newrange->end($oldend);
   my $key = $lrev->project() . '/' . $lrev->package();
   # we do not care about the ordering
   push @{$self->{'ranges'}->{$key}}, $newrange;
-  print Dumper($self->{'ranges'});
 }
 
 1;

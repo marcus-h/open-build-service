@@ -126,6 +126,7 @@ sub idx {
 sub satisfies {
   my ($self, @constraints) = @_;
   for (@constraints) {
+    next unless $_->isfor($self);
     return 0 unless $_->eval($self);
   }
   # only init if really needed

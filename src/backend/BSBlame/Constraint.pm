@@ -17,10 +17,11 @@ my $opre = join('|',
                 map {"\Q$_\E"} sort {length($b) <=> length($a)} keys(%$opmap));
 
 sub new {
-  my ($class, $expr) = @_;
+  my ($class, $expr, @preexprs) = @_;
   my $self = {};
   bless $self, $class;
   $self->parse($expr);
+  push @{$self->{'preconditions'}}, BSBlame::Constraint->new($_) for @preexprs;
   return $self;
 }
 
@@ -38,6 +39,14 @@ sub eval {
   my $meth = $rev->can($self->{'attr'});
   die("unknown attribute $self->{'attr'}\n") unless $meth;
   return $opmap->{$self->{'op'}}->($rev->$meth(), $self->{'val'});
+}
+
+sub isfor {
+  my ($self, $rev) = @_;
+  for (@{$self->{'preconditions'} || []}) {
+    return 0 if !$_->eval($rev);
+  }
+  return 1;
 }
 
 # needed? (only for constraint merging, contradiction checking etc.)
