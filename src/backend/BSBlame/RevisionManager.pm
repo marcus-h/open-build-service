@@ -60,7 +60,7 @@ sub iter {
 
 sub find {
   my ($self, $projid, $packid, $lsrcmd5, @constraints) = @_;
-  push @constraints, BSBlame::Constraint->new("lsrcmd5 = x$lsrcmd5", "project = branch");
+  push @constraints, BSBlame::Constraint->new("lsrcmd5 = $lsrcmd5");
   my $it = $self->iter($projid, $packid, @constraints);
   return $it->next();
 }
