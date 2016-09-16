@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 28;
+use Test::More tests => 29;
 
 use BSSrcBlame;
 
@@ -200,6 +200,12 @@ test_merge("my and /dev/null",
     [0, 9],
     [0, 10],
     [0, 11]
+  ));
+
+test_merge("/dev/null and common",
+  ['/dev/null', fixture('common'), fixture('common')],
+  (
+    [0, -1]
   ));
 
 test_merge("my, your and common",
