@@ -23,19 +23,29 @@ sub blame_is {
   my $code = delete $opts{'code'} || 200;
   die("'expected' option required\n") unless exists $opts{'expected'} || $code != 200;
   my $exp = delete $opts{'expected'};
-  my $res;
+  $exp .= 'NUMLINES: ' . split("\n", $exp) if $exp;
+  # by default, we always expand
+  $opts{'expand'} = 1 unless exists $opts{'expand'};
+  my $blamedata;
   eval {
-#    list($projid, $packid);
-    $res = getfile($projid, $packid, $filename, 'expand' => 1, %opts);
+    $blamedata = blame($projid, $packid, $filename, %opts);
   };
   if ($code && $code != 200) {
     like($@, qr/^$code/, $test_name);
     return;
   }
-#  is($projid, $exp, $test_name);
-#  ok(1, $test_name);
-  $exp =~ s/^[^:]*: //gm;
-  is($res, $exp, $test_name);
+  my $file = getfile($projid, $packid, $filename, %opts);
+  my @lines = split("\n", $file);
+  for (my $i = 0; $i < @lines; $i++) {
+    my $blamerev = $blamedata->{'revision'}->[$i];
+    my $project = $blamerev->{'project'} || '';
+    my $package = $blamerev->{'package'} || '';
+    my $rev = $blamerev->{'rev'} || '';
+    $lines[$i] = "$project/$package/r$rev: $lines[$i]";
+  }
+  $lines[@lines] = 'NUMLINES: ' . @lines;
+  $file = join("\n", @lines);
+  is($file, $exp, $test_name);
 }
 
 sub list_like {
@@ -191,6 +201,16 @@ sub branch {
     'request' => 'POST'
   };
   return rpc($param, $BSXML::revision_acceptinfo, hash2query(%query));
+}
+
+sub blame {
+  my ($projid, $packid, $filename, %query) = @_;
+  $query{'cmd'} = 'blame';
+  my $param = {
+    'uri' => "$BSConfig::srcserver/source/$projid/$packid/$filename",
+    'request' => 'POST'
+  };
+  return rpc($param, $BSXML::blamedata, hash2query(%query));
 }
 
 1;
