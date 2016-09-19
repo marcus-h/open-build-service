@@ -163,10 +163,10 @@ EOF
 list_like("baserev points to r4", "branch", "pkg1", xpath => '@rev = 6 and ./linkinfo[@baserev = "701a3c4af1cdebd05bdf0c40e12dbb3d" and not(@error)]');
 blame_is("branch at r6", "branch", "pkg1", "testfile", expected => <<EOF);
 origin/opkg1/r1: We start with
-branch/pkg1/r7: some text and realize that
-branch/pkg1/r7: this file changed
-branch/pkg1/r7: quite a lot and evolved into
-branch/pkg1/r7: a not so
+branch/pkg1/r6: some text and realize that
+branch/pkg1/r6: this file changed
+branch/pkg1/r6: quite a lot and evolved into
+branch/pkg1/r6: a not so
 origin/opkg1/r1: simple text
 origin/opkg1/r1: file.
 branch/pkg1/r3: This is a very cool line.
