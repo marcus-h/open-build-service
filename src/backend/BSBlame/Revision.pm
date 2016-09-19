@@ -4,29 +4,28 @@ use strict;
 use warnings;
 
 use Data::Dumper;
+use Digest::MD5 ();
 
 use BSSrcrep;
 use BSRevision;
 use BSXML;
 
-# can be set to use a specific getrev impl (coderef)
-our $getrev;
-
 sub new {
-  my ($class, $rev, $idx, $getrev) = @_;
+  my ($class, $rev, $revmgr, $idx) = @_;
   print "BSBlame::Revision::new\n";
   return bless {
     'data' => {
       'rev' => $rev,
-      'idx' => $idx,
-      'getrev' => $getrev
+      'revmgr' => $revmgr,
+      'idx' => $idx
     }
   }, $class;
 }
 
 sub init {
-  my ($self) = @_;
+  my ($self, $lrev, $trev) = @_;
   return if $self->{'data'}->{'lsrcmd5'};
+  die("trev without lrev makes no sense\n") if $trev && !$lrev;
   my $data = $self->{'data'};
   $data->{'lsrcmd5'} = $data->{'rev'}->{'srcmd5'};
   my %li;
@@ -35,9 +34,9 @@ sub init {
   if (%li) {
     $data->{'lsrcmd5'} = $li{'lsrcmd5'};
     $data->{'expanded'} = 1;
-    my $lrev = $data->{'getrev'}->($data->{'rev'}->{'project'},
-                                   $data->{'rev'}->{'package'},
-                                   $data->{'lsrcmd5'});
+    my $lrev = $data->{'revmgr'}->intgetrev($data->{'rev'}->{'project'},
+                                            $data->{'rev'}->{'package'},
+                                            $data->{'lsrcmd5'});
     $files = BSSrcrep::lsrev($lrev);
     $l = BSSrcrep::repreadxml($lrev, '_link', $files->{'_link'},
                               $BSXML::link);
@@ -50,11 +49,15 @@ sub init {
     $data->{'branch'} = grep {(keys %$_)[0] eq 'branch'} @patches;
     $tsrcmd5 = $l->{'baserev'};
   }
-  if ($l) {
+  if ($l && !$trev) {
     my $tprojid = $l->{'project'} || $data->{'rev'}->{'project'};
     my $tpackid = $l->{'package'} || $data->{'rev'}->{'package'};
-    my $trev = $data->{'getrev'}->($tprojid, $tpackid, $tsrcmd5);
-    $data->{'targetrev'} = BSBlame::Revision->new($trev);
+    $trev = $data->{'revmgr'}->intgetrev($tprojid, $tpackid, $tsrcmd5);
+    $data->{'targetrev'} = BSBlame::Revision->new($trev, $data->{'revmgr'});
+  } elsif ($trev) {
+    $self->localrev($lrev);
+    $data->{'targetrev'} = $trev;
+    $self->resolved(1);
   }
 }
 
@@ -86,30 +89,55 @@ sub islink {
   return exists $self->{'data'}->{'link'};
 }
 
+sub isplain {
+  my ($self) = @_;
+  return !$self->islink() && !$self->isexpanded();
+}
+
 sub lsrcmd5 {
   my ($self) = @_;
   $self->init();
   return $self->{'data'}->{'lsrcmd5'};
 }
 
+sub srcmd5 {
+  my ($self) = @_;
+  return $self->{'data'}->{'rev'}->{'srcmd5'};
+}
+
+sub time {
+  my ($self) = @_;
+  die("time cannot be requested for an expanded rev\n") if $self->isexpanded();
+  return $self->{'data'}->{'rev'}->{'time'};
+}
+
 sub localrev {
   my ($self, $lrev) = @_;
   $self->init();
+  my $data = $self->{'data'};
   if ($lrev) {
-    die("localrev can only be set for a link\n") unless $self->islink();
-    die("localrev cannot be set twice\n") if $self->{'data'}->{'localrev'};
-    $self->{'data'}->{'localrev'} = $lrev;
+#    die("localrev cannot be set for a plain rev\n") if $self->isplain();
+    die("localrev cannot be changed\n") if $data->{'localrev'}
+      && $data->{'localrev'} != $lrev; # XXX: use ref comparison
+    $data->{'localrev'} = $lrev;
   }
-  return $self unless $self->islink();
-  return $self->{'data'}->{'localrev'};
+#  return $self if $self->isplain();
+  return $self if $self->resolved() && !$data->{'localrev'};
+  return $data->{'localrev'};
 }
 
 sub targetrev {
   my ($self) = @_;
   $self->init();
-  die("targetrev makes no sense for a non link\n")
-    unless $self->islink() || $self->isexpanded();
+  die("targetrev makes no sense for a non link\n") if $self->isplain();
   return $self->{'data'}->{'targetrev'};
+}
+
+sub intrev {
+  my ($self) = @_;
+  my $lrev = $self->localrev();
+  return $lrev->intrev() if $lrev && !$self->isexpanded() && $lrev != $self;
+  return $self->{'data'}->{'rev'};
 }
 
 sub resolved {
@@ -120,7 +148,9 @@ sub resolved {
 
 sub idx {
   my ($self) = @_;
-  return $self->{'data'}->{'idx'};
+  my $lrev = $self->localrev();
+  return $self->{'data'}->{'idx'} if !$lrev || $lrev == $self;
+  return $lrev->idx();
 }
 
 sub satisfies {
@@ -132,9 +162,48 @@ sub satisfies {
   # only init if really needed
   $self->init();
   if ($self->resolved() && ($self->islink() || $self->isexpanded())) {
-    return $self->targetrev()->satifies(@constraints);
+    return $self->targetrev()->satisfies(@constraints);
   }
   return 1;
+}
+
+sub constraints {
+  my ($self, @constraints) = @_;
+  my $data = $self->{'data'};
+  push @{$data->{'constraints'}}, @constraints;
+  $data->{'targetrev'}->constraints(@constraints) if $data->{'targetrev'};
+  return @{$data->{'constraints'}};
+}
+
+sub revmgr {
+  my ($self) = @_;
+  return $self->{'data'}->{'revmgr'};
+}
+
+sub files {
+  my ($self) = @_;
+  return $self->revmgr()->lsrev($self);
+}
+
+sub file {
+  my ($self, $filename) = @_;
+  return $self->revmgr()->repfilename($self, $filename);
+}
+
+sub cookie {
+  my ($self) = @_;
+  die("rev has to be resolved\n") unless $self->resolved();
+  return $self->{'data'}->{'cookie'} if $self->{'data'}->{'cookie'};
+  my $cookie = $self->project() . '/' . $self->package;
+  $cookie .= '/' . $self->localrev()->intrev()->{'rev'};
+  # idx is needed in the future if we support deleted revisions...
+  $cookie .= '/' . $self->localrev()->idx();
+  if ($self->isexpanded()) {
+    $cookie .= "\n" . $self->targetrev()->cookie();
+  }
+  print Dumper($cookie);
+  $self->{'data'}->{'cookie'} = Digest::MD5::md5_hex($cookie);
+  return $self->{'data'}->{'cookie'};
 }
 
 1;

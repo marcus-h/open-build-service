@@ -9,7 +9,6 @@ use Data::Dumper;
 use BSSrcrep;
 
 use BSBlame::Blamer;
-use BSBlame::BlameStorage;
 use BSBlame::Constraint;
 use BSBlame::Revision;
 use BSBlame::RevisionManager;
@@ -19,7 +18,7 @@ use BSBlame::RevisionManager;
 
 sub new {
   my ($class, $storage) = @_;
-  return bless {'storage' => $storage || BSBlame::BlameStorage->new()}, $class;
+  return bless {'storage' => $storage}, $class;
 }
 
 sub blame {

@@ -29,6 +29,8 @@ sub end {
 sub contains {
   my ($self, $rev) = @_;
   die("illegal rev\n") if !defined($rev) || $rev->isexpanded();
+#  print $rev->{'data'}->{'rev'}->{'rev'} . "\n";
+#  print $rev->idx() . "\n";
   return 0 unless $rev->idx() >= $self->{'start'};
   return 0 unless !defined($self->{'end'}) || $rev->idx() <= $self->{'end'};
   # representant of the whole range
@@ -48,6 +50,13 @@ sub contains {
     return 0 unless $trrev->package() eq $trev->package();
   }
   return 1;
+}
+
+sub pred {
+  my ($self, $rev) = @_;
+  die("rev not in range\n") unless $self->contains($rev);
+  return undef unless $rev->idx() < $self->{'end'};
+  return $self->{'data'}->[$rev->idx() + 1];
 }
 
 sub iter {

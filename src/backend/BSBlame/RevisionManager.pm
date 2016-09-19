@@ -12,11 +12,15 @@ use BSBlame::Constraint;
 use BSBlame::Iterator;
 
 sub new {
-  my ($class, $projectsdir, $srcrevlay, $getrev) = @_;
+  my ($class, $projectsdir, $srcrevlay, $getrev, $lsrev, $repfilename,
+      $expand) = @_;
   return bless {
     'projectsdir' => $projectsdir,
     'srcrevlay' => $srcrevlay,
-    'getrev' => $getrev
+    'getrev' => $getrev,
+    'lsrev' => $lsrev,
+    'repfilename' => $repfilename,
+    'expand' => $expand
   }, $class;
 }
 
@@ -34,7 +38,7 @@ sub read {
     my $orev = pop @orevs;
     $orev->{'project'} = $projid;
     $orev->{'package'} = $packid;
-    my $lrev = BSBlame::Revision->new($orev, $i, $self->{'getrev'});
+    my $lrev = BSBlame::Revision->new($orev, $self, $i);
     push @revs, $lrev;
     if (!$range->contains($lrev)) {
       $range->end($i - 1);
@@ -50,6 +54,42 @@ sub read {
   $self->{'revs'}->{$key} = \@revs;
   $self->{'ranges'}->{$key} = \@ranges;
   return \@revs;
+}
+
+# returns an "internal" revision (part of the _public_ api)
+sub intgetrev {
+  my ($self, @args) = @_;
+  return $self->{'getrev'}->(@args);
+}
+
+sub lsrev {
+  my ($self, $rev) = @_;
+  return $self->{'lsrev'}->($rev->intrev());
+}
+
+sub expand {
+  my ($self, $lrev, $trev, $fatal) = @_;
+  die("rev must be a branch\n") unless $lrev->isbranch();
+  my $lfiles = $lrev->files();
+  my %lrev = %{$lrev->intrev()};
+  $lrev{'linkrev'} = $trev->srcmd5();
+#  print Dumper($lfiles);
+  my $files = $self->{'expand'}->(\%lrev, $lfiles);
+#  print Dumper($files);
+  if (!ref($files)) {
+    die("cannot be expanded\n") if $fatal;
+    return undef;
+  }
+  my $rev = BSBlame::Revision->new(\%lrev, $self);
+  $rev->init($lrev, $trev);
+  return $rev;
+}
+
+sub repfilename {
+  my ($self, $rev, $filename) = @_;
+  my $md5 = $self->lsrev($rev)->{$filename};
+  return '' unless $md5;
+  return $self->{'repfilename'}->($rev->intrev(), $filename, $md5);
 }
 
 sub iter {
@@ -68,6 +108,8 @@ sub find {
 sub range {
   my ($self, $lrev) = @_;
   my $key = $lrev->project() . '/' . $lrev->package();
+  # XXX: revs needed/just the read?
+  my $revs = $self->read($lrev->project(), $lrev->package());
   die("$key not known\n") unless $self->{'ranges'}->{$key};
   for (@{$self->{'ranges'}->{$key}}) {
     return $_ if $_->contains($lrev);
