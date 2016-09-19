@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 29;
+use Test::More tests => 30;
 
 use BSSrcBlame;
 
@@ -455,6 +455,14 @@ test_merge("my3 your3 common3 (adds + deletes + changes)",
     [0, 10],
     [0, 11],
     [2, 10]
+  ));
+
+test_merge("common2 my2.mdel common2 (basically a two-way diff)",
+  [fixture('common2'), fixture('my2.mdel'), fixture('common2')],
+  (
+    [2, 0],
+    [2, 1],
+    [2, 4]
   ));
 
 #test_merge("my2, your2 and common (my2 and your2 share a new line)",
