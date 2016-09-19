@@ -67,6 +67,11 @@ sub merge {
     # your and common also has the type "add" (that's why we
     # just check the type of the my ($FM) block))
     next if $odd == $FC && $diff3->{'data'}->[$FM]->[2] eq 'a';
+    # nothing todo, if your is the odd file and the diff
+    # block of your and common has type "add" ("a")
+    # (that is, lines were removed from the your file and, hence,
+    # there is nothing to merge)
+    next if $odd == $FY && $diff3->{'data'}->[$odd]->[2] eq 'a';
     # if common is the odd file, the my file and the your
     # file have the "same" diff - so we can either take the
     # information from the my file or from the your file.
