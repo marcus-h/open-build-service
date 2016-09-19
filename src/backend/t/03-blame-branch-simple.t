@@ -160,8 +160,8 @@ simple text
 file.
 This is a very cool line.
 EOF
-list_like("baserev points to r4", "branch", "pkg1", xpath => './linkinfo[@baserev = "701a3c4af1cdebd05bdf0c40e12dbb3d" and not(@error)]');
-blame_is("branch at r7", "branch", "pkg1", "testfile", expected => <<EOF);
+list_like("baserev points to r4", "branch", "pkg1", xpath => '@rev = 6 and ./linkinfo[@baserev = "701a3c4af1cdebd05bdf0c40e12dbb3d" and not(@error)]');
+blame_is("branch at r6", "branch", "pkg1", "testfile", expected => <<EOF);
 origin/opkg1/r1: We start with
 branch/pkg1/r7: some text and realize that
 branch/pkg1/r7: this file changed
