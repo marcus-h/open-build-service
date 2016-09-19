@@ -9,6 +9,7 @@ use Data::Dumper;
 use BSSrcrep;
 
 use BSBlame::Blamer;
+use BSBlame::BlameStorage;
 use BSBlame::Constraint;
 use BSBlame::Revision;
 use BSBlame::RevisionManager;
@@ -17,21 +18,24 @@ use BSBlame::RevisionManager;
 # of a class (it's a class for reusability reasons...)
 
 sub new {
-  my ($class) = @_;
-  return {}, $class;
+  my ($class, $storage) = @_;
+  return bless {'storage' => $storage || BSBlame::BlameStorage->new()}, $class;
 }
 
 sub blame {
   my ($self, $rev, $filename) = @_;
   $self->resolve($rev);
-  my $mainblamer = BSBlame::Blamer->new($rev);
+  print Dumper($self);
   my @blamers;
-  my @deps = $mainblamer;
+  my @deps = BSBlame::Blamer->new($rev, $self->{'storage'});
+  my %seen;
   while (@deps) {
     my $blamer = shift(@deps);
     push @blamers, $blamer;
     for my $rev (@{$blamer->deps()}) {
-      push @deps, BSBlame::Blamer->new($rev);
+      next if $seen{$rev->cookie()};
+      $seen{$rev->cookie()} = 1;
+      push @deps, BSBlame::Blamer->new($rev, $self->{'storage'});
     }
     # potential inifinite loop?
   }
@@ -47,7 +51,7 @@ sub blame {
     my $ready = {map {$_ => 1} @ready};
     @blamers = grep {!$ready->{$_}} @blamers;
   }
-  my $blamedata = $rev->blamedata($filename);
+  my $blamedata = $self->{'storage'}->retrieve($rev, $filename);
   print "\n###\n";
   print "file lines: " . split('\n', BSSrcrep::repreadstr($rev->intrev(), $filename, $rev->files()->{$filename})) . "\n";
   print "blame lines: " . scalar(@$blamedata) . "\n";

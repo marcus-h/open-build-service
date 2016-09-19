@@ -8,8 +8,8 @@ use Data::Dumper;
 use BSSrcBlame;
 
 sub new {
-  my ($class, $rev) = @_;
-  my $self = {'rev' => $rev};
+  my ($class, $rev, $storage) = @_;
+  my $self = {'rev' => $rev, 'storage' => $storage};
   bless $self, $class;
   $self->setupdeps_expanded() if $rev->isexpanded();
   $self->setupdeps_branch() if $rev->isbranch();
@@ -67,22 +67,25 @@ sub lastworking {
 
 sub ready {
   my ($self, $filename) = @_;
-  return 1 if $self->{'rev'}->blamedata($filename);
-  return !grep {!$_->blamedata($filename)} @{$self->{'deps'}};
+  my $storage = $self->{'storage'};
+  return 1 if $storage->retrieve($self->{'rev'}, $filename);
+  return !grep {!$storage->retrieve($_, $filename)} @{$self->{'deps'}};
 }
 
 sub blame {
   my ($self, $filename) = @_;
   die("deps not blamed\n") unless $self->ready($filename);
   my $rev = $self->{'rev'};
-  return $rev->blamedata($filename) if $rev->blamedata($filename);
+  my $storage = $self->{'storage'};
+  return $storage->retrieve($rev, $filename)
+    if $storage->retrieve($rev, $filename);
   my $blamedata;
   $blamedata = $self->blame_expanded($filename) if $rev->isexpanded();
   $blamedata = $self->blame_branch($filename) if $rev->isbranch();
   $blamedata = $self->blame_plain($filename) if $rev->isplain();
   die("plain link not supported\n") if $rev->islink() && !$rev->isbranch();
   die("XXX\n") unless $blamedata;
-  $rev->blamedata($filename, $blamedata);
+  $storage->store($rev, $filename, $blamedata);
   return $blamedata;
 }
 
@@ -100,17 +103,18 @@ sub blame_branch {
   my ($self, $filename) = @_;
   print "blame branch\n";
   die("TODO: conflict blame\n") if $self->hasconflict();
+  my $storage = $self->{'storage'};
   my ($brev, $pbrev, $plrev) = @{$self->{'deps'}};
   # no predecessor => start of a branch, hence, just take the baserev's
   # blamedata (assumption: no keepcontent case branch)
-  return $brev->blamedata($filename) unless $plrev;
+  return $storage->retrieve($brev, $filename) unless $plrev;
   # calculate blame for last working expanded predecessor
   my $pblame = $self->calcblame($filename, $plrev, $brev, $pbrev);
-  # next diff my rev against its last working expanded predecessor:
+  # next diff my rev against its last working expanded predecessor
   # 2-way diff: diff prev lrev
   my $lrev = $self->{'rev'};
   my $prev = $lrev->revmgr()->expand($plrev, $brev, 1);
-  $prev->blamedata($filename, $pblame);
+  $storage->store($prev, $filename, $pblame);
   return $self->calcblame($filename, $prev, $lrev, $prev);
 }
 
@@ -128,28 +132,32 @@ sub blame_plain {
 # could be static, but this way subclasses can override it
 sub calcblame {
   my ($self, $filename, $myrev, $yourrev, $commonrev) = @_;
+  my $storage = $self->{'storage'};
   my @blames = (
-    $myrev ? $myrev->blamedata($filename) : undef,
-    $yourrev ? $yourrev->blamedata($filename) : undef,
-    $commonrev ? $commonrev->blamedata($filename) : undef
+    $myrev ? $storage->retrieve($myrev, $filename) : undef,
+    $yourrev ? $storage->retrieve($yourrev, $filename) : undef,
+    $commonrev ? $storage->retrieve($commonrev, $filename) : undef
   );
-  # XXX: add cnumlines
   my @blame;
-  if ($yourrev && $commonrev) {
+  if ($myrev && $yourrev && $commonrev) {
     @blame = BSSrcBlame::merge($myrev->file($filename) || '/dev/null',
                                $yourrev->file($filename) || '/dev/null',
-                               $commonrev->file($filename)
-                                 || '/dev/null',
-                               scalar(@{$commonrev->blamedata($filename)}) - 1);
-    print Dumper(\@blame);
+                               $commonrev->file($filename) || '/dev/null',
+                               scalar(@{$blames[2]}) - 1);
+#    print Dumper(\@blame);
+  } elsif (!$myrev && $yourrev && !$commonrev) {
+    @blame = BSSrcBlame::merge('/dev/null',
+                               $yourrev->file($filename) || '/dev/null',
+                               '/dev/null');
   } else {
-    @blame = BSSrcBlame::merge($yourrev->file($filename) || '/dev/null',
-                               '/dev/null', '/dev/null');
+    die("calcblame: illegal argument combination\n");
   }
   # indicates that the file was removed (see also t/01-blame.t)
   @blame = () if @blame == 1 && $blame[0]->[1] == -1;
 #  die("blame conflict (logic error)\n") unless defined($blame);
-  return [map {$blames[$_->[0]] ? $blames[$_->[0]]->[$_->[1]] : $yourrev} @blame];
+  return [
+    map {$blames[$_->[0]] ? $blames[$_->[0]]->[$_->[1]] : $yourrev} @blame
+  ];
 }
 
 1;
