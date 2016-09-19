@@ -50,9 +50,11 @@ sub hasconflict {
   return $self->{'conflict'} if exists $self->{'conflict'};
   # need to check this only for a branch (or a link...)
   my $revmgr = $self->{'rev'}->revmgr();
-  my $rev = $revmgr->expand($self->{'rev'}, $self->{'deps'}->[0]);
-  $self->{'conflict'} = !defined($rev);
-  return $self->{'conflict'};
+  my ($brev, $pbrev, $plrev) = @{$self->{'deps'}};
+  # no predecessor => start of a branch, hence, no conflict
+  return $self->{'conflict'} = 0 unless $plrev;
+  my $rev = $revmgr->expand($plrev, $brev);
+  return $self->{'conflict'} = !defined($rev);
 }
 
 sub deps {
