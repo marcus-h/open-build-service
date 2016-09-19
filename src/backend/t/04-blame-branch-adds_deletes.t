@@ -89,7 +89,7 @@ the new
 file
 filea that causes a conflict.
 EOF
-list_like("conflict in the branch", "branch", "pkg2", xpath => './linkinfo/@error');
+list_like("conflict in the branch", "branch", "pkg2", xpath => '@rev = 5 and ./linkinfo/@error');
 commit("origin", "opkg2", {}, filea => <<EOF);
 This is
 the new
@@ -97,10 +97,13 @@ file
 filea.
 EOF
 list_like("no conflict in the branch", "branch", "pkg2", xpath => 'not(./linkinfo/@error)');
+# filea in the branch and filea in the origin have the same content
+# (hence, all changes common from the filea in the origin (due to the
+# default for $ctie in BSSrcBlame::merge))
 blame_is("branch at r5 (after origin changed)", "branch", "pkg2", "filea", expected => <<EOF);
-origin/opkg2/r5: This is
-origin/opkg2/r5: the new
-origin/opkg2/r5: file
+origin/opkg2/r4: This is
+origin/opkg2/r4: the new
+origin/opkg2/r4: file
 origin/opkg2/r5: filea.
 EOF
 
