@@ -43,23 +43,23 @@ sub test_merge {
 # test cases for BSSrcBlame::diff3
 
 test_diff3("two-way diff of my and /dev/null",
-  [fixture('my'), '/dev/null', '/dev/null'],
+  ['/dev/null', fixture('my'), '/dev/null'],
   (
     {
-      'odd' => 0,
+      'odd' => 1,
       'data' => [
-        [0, 11, 'c'],
         [-1, -1, 'a'],
+        [0, 11, 'c'],
         [-1, -1, 'a']
       ]
     }
   ));
 
 test_diff3("two-way diff of your and common",
-  [fixture('your'), fixture('common'), fixture('common')],
+  [fixture('common'), fixture('your'), fixture('common')],
   (
     {
-      'odd' => 0,
+      'odd' => 1,
       'data' => [
         [4, 5, 'c'],
         [4, 5, 'c'],
@@ -67,10 +67,10 @@ test_diff3("two-way diff of your and common",
       ]
     },
     {
-      'odd' => 0,
+      'odd' => 1,
       'data' => [
-        [10, 12, 'c'],
         [9, 9, 'a'],
+        [10, 12, 'c'],
         [9, 9, 'a']
       ]
     }
