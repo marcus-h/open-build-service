@@ -163,9 +163,8 @@ origin/opkg3/r2: A line from the origin.
 origin/opkg3/r1: Section end.
 EOF
 
-# we do this in order to test that the blame for filea
-# does not change if there is a conflict in a different file.
-# add a completely different filea to the branch
+# introduce a new filea and fileb and add some conflicts
+# to fileb
 commit("branch", "pkg3", {keeplink => 1}, filea => <<EOF);
 This is filea with 2 sections.
 Section start:
@@ -258,8 +257,9 @@ branch/pkg3/r9: resolved
 origin/opkg3/r7: fileb.
 EOF
 # same blame for filea as in r7 of the branch
-# (filea was not affected by the conflict)
-blame_is("filea at r7 (after conflict in fileb)", "branch", "pkg3", "filea", expected => <<EOF);
+# (filea was not affected by the conflict, but its blame was computed
+# by the automerge code)
+blame_is("filea at r9 (after conflict in fileb)", "branch", "pkg3", "filea", expected => <<EOF);
 origin/opkg3/r5: This is filea with 2 sections.
 origin/opkg3/r6: Section 1 start:
 origin/opkg3/r6: A line from the origin.
