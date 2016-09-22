@@ -250,12 +250,12 @@ resolved
 fileb.
 EOF
 list_like("check baserev and no conflict at r9", "branch", "pkg3",
-  xpath => './linkinfo[@baserev = "508d66737cb3da3e8b00b8b3bbae5982" and not(@error)]');
+  xpath => '@rev = "9" and ./linkinfo[@baserev = "508d66737cb3da3e8b00b8b3bbae5982" and not(@error)]');
 blame_is("branch at r9", "branch", "pkg3", "fileb", expected => <<EOF);
-origin/opkg3/r5: This is
-branch/pkg3/r7: the new
-branch/pkg3/r8: resolved
-origin/opkg3/r5: fileb.
+origin/opkg3/r7: This is
+branch/pkg3/r8: the new
+branch/pkg3/r9: resolved
+origin/opkg3/r7: fileb.
 EOF
 # same blame for filea as in r7 of the branch
 # (filea was not affected by the conflict)
