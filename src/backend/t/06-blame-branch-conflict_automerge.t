@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 26;
+use Test::More tests => 27;
 
 use BSBlameTest qw(blame_is list_like create commit del branch);
 
@@ -119,6 +119,7 @@ quite
 simple text.
 
 Section start:
+Resolved:
 A line from the branch.
 Another line from the branch.
 A line from the origin.
@@ -174,6 +175,23 @@ Section end.
 
 Yet another line from the origin.
 EOF
+# this is only needed for understanding the testcase
+blame_is("origin at r8", "origin", "opkg4", "testfile", expected => <<EOF);
+origin/opkg4/r4: This is a
+origin/opkg4/r7: simple text.
+origin/opkg4/r7: 
+origin/opkg4/r7: Section 1 start:
+origin/opkg4/r7: Nested section start:
+origin/opkg4/r7: Nested section end.
+origin/opkg4/r7: Section 1 end.
+origin/opkg4/r7: 
+origin/opkg4/r7: Section start:
+origin/opkg4/r8: A line from the origin.
+origin/opkg4/r7: Section end.
+origin/opkg4/r8: 
+origin/opkg4/r8: Yet another line from the origin.
+EOF
+
 list_like("no conflict (origin at r8)", "branch", "pkg4",
   xpath => 'not(./linkinfo/@error)');
 # introduce yet another conflict
@@ -256,10 +274,10 @@ EOF
 list_like("check origin's srcmd5 at r10", "origin", "opkg4",
   xpath => '@rev = 10 and @srcmd5 = "ce715b27f97e1f246fc37676dc6a58c7"');
 blame_is("branch at r6", "branch", "pkg4", "testfile", expected => <<EOF);
-origin/opkg/r10: A simple file.
-origin/opkg/r10: Section start:
-origin/opkg/r10: A line.
-origin/opkg/r10: Section end.
+origin/opkg4/r10: A simple file.
+origin/opkg4/r7: Section start:
+origin/opkg4/r10: A line.
+origin/opkg4/r7: Section end.
 EOF
 
 # introduce a conflict
@@ -287,12 +305,20 @@ Section end.
 EOF
 list_like("check origin's srcmd5 at r13", "origin", "opkg4",
   xpath => '@rev = 13 and @srcmd5 = "ce715b27f97e1f246fc37676dc6a58c7"');
+# same as in r13 (and r12 and r10), except the last line was added
+commit("origin", "opkg4", {}, testfile => <<EOF);
+A simple file.
+Section start:
+A line.
+Section end.
+Yet another line from the origin.
+EOF
 # introduce a conflict
 commit("origin", "opkg4", {}, testfile => <<EOF);
 A line from the origin.
 EOF
-list_like("origin at r14", "origin", "opkg4",
-  xpath => '@rev = 14 and @srcmd5 = "0c8c56d65146aea45eea2c3dd3cbf5a4"');
+list_like("origin at r15", "origin", "opkg4",
+  xpath => '@rev = 15 and @srcmd5 = "0c8c56d65146aea45eea2c3dd3cbf5a4"');
 list_like("check baserev and conflict in r7", "branch", "pkg4",
   xpath => './linkinfo[@baserev = "417a4a60603b8f8fdb0bca16ecafa910" and @error]');
 
@@ -305,14 +331,16 @@ A simple file.
 Section start:
 A line.
 Section end.
+Yet another line from the origin.
 EOF
 list_like("check baserev and no conflict at r7", "branch", "pkg4",
   xpath => './linkinfo[@baserev = "0c8c56d65146aea45eea2c3dd3cbf5a4" and not(@error)]');
 blame_is("branch at r7 (resolved conflict)", "branch", "pkg4", "testfile", expected => <<EOF);
 branch/pkg4/r7: Resolved file:
-origin/opkg4/r14: A line from the origin.
+origin/opkg4/r15: A line from the origin.
 origin/opkg4/r10: A simple file.
-origin/opkg4/r12: Section start:
+origin/opkg4/r7: Section start:
 origin/opkg4/r10: A line.
-origin/opkg4/r12: Section end.
+origin/opkg4/r7: Section end.
+origin/opkg4/r14: Yet another line from the origin.
 EOF
