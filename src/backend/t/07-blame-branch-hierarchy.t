@@ -4,7 +4,10 @@ use strict;
 use warnings;
 use Test::More tests => 25;
 
-use BSBlameTest qw(blame_is list_like create commit del branch);
+use BSBlameTest qw(blame_is list_like create commit branch);
+
+# This testcase tests different levels of branch hierarchies (a branch of
+# a branch etc.) and the latest automerge code.
 
 create("origin", "opkg5");
 commit("origin", "opkg5", {time => 1}, testfile => <<EOF);
