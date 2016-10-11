@@ -508,8 +508,8 @@ origin/opkg5/r3: A line from origin/opkg5.
 origin/opkg5/r7: Yet another line from origin/opkg5.
 origin/opkg5/r2: Section 1 end.
 origin/opkg5/r2: Section 2 start:
-branch/pkg52/r8: Only this line is left.
+branch/pkg51/r8: Only this line is left.
 origin/opkg5/r2: Section 2 end.
-origin/opkg5/r12: A line from the origin at EOF.
-origin/opkg5/r12: A second line from the origin at EOF.
+origin/opkg5/r6: A line from the origin at EOF.
+origin/opkg5/r7: A second line from the origin at EOF.
 EOF
