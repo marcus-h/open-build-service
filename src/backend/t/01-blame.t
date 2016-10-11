@@ -15,10 +15,6 @@ sub test_sub {
   is_deeply($code_ref->(@$args), $expected, $test_name);
 }
 
-sub array_to_ref {
-  return \@_;
-}
-
 sub fixture {
   my ($filename) = @_;
   my $dir = __FILE__;
@@ -29,14 +25,14 @@ sub fixture {
 sub test_diff3 {
   my ($test_name, $args, @expected) = @_;
   test_sub("diff3: " . $test_name,
-    sub { return array_to_ref(BSSrcBlame::diff3(@_)); },
+    sub { return [BSSrcBlame::diff3(@_)]; },
     $args, \@expected);
 }
 
 sub test_merge {
   my ($test_name, $args, @expected) = @_;
   test_sub("merge: " . $test_name,
-    sub { return array_to_ref(BSSrcBlame::merge(@_)); },
+    sub { return [BSSrcBlame::merge(@_)]; },
     $args, \@expected);
 }
 
