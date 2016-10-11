@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 30;
+use Test::More tests => 31;
 
 use BSSrcBlame;
 
@@ -204,9 +204,7 @@ test_merge("my and /dev/null",
 
 test_merge("/dev/null and common",
   ['/dev/null', fixture('common'), fixture('common')],
-  (
-    [0, -1]
-  ));
+  ());
 
 test_merge("my, your and common",
   [fixture('my'), fixture('your'), fixture('common')],
@@ -462,6 +460,15 @@ test_merge("common2 my2.mdel common2 (basically a two-way diff)",
   (
     [2, 0],
     [2, 1],
+    [2, 4]
+  ));
+
+test_merge("my2.sdel common2 common2 (my2.sdel just removes a single line)",
+  [fixture('my2.sdel'), fixture('common2'), fixture('common2')],
+  (
+    [2, 0],
+    [2, 1],
+    [2, 3],
     [2, 4]
   ));
 
