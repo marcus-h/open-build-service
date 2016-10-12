@@ -1769,4 +1769,13 @@ our $publishedpath = [
 	'url',
 ];
 
+our $blamerevision = [
+  map {$_ eq 'rev' ? ('rev', 'project', 'package') : $_} @$revision
+];
+
+our $blamedata = [
+    'blamedata' =>
+        [ $blamerevision ]
+];
+
 1;
