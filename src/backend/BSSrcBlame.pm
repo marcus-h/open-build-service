@@ -45,7 +45,7 @@ our $FC = 2; # common file
 sub merge {
   my ($my, $your, $common, $cnumlines, $ctie) = @_;
   my @diff3 = diff3($my, $your, $common);
-  return undef if grep { !defined($_->{'odd'}) } @diff3;
+  return undef if grep {!defined($_->{'odd'})} @diff3;
   $ctie = $FY unless defined($ctie);
   die("illegal ctie value: $ctie\n") unless $ctie == $FY || $ctie == $FM;
   my @merge;
