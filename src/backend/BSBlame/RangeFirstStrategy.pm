@@ -24,13 +24,13 @@ sub new {
 sub blame {
   my ($self, $rev, $filename) = @_;
   $self->resolve($rev);
-  print Dumper($self);
   my @blamers;
   my @deps = BSBlame::Blamer->new($rev, $self->{'storage'});
   my %seen;
   while (@deps) {
     my $blamer = shift(@deps);
     push @blamers, $blamer;
+    $self->lastworkingautomerge($blamer) if $blamer->hasconflict();
     for my $rev (@{$blamer->deps()}) {
       next if $seen{$rev->cookie()};
       $seen{$rev->cookie()} = 1;
@@ -38,11 +38,8 @@ sub blame {
     }
     # potential inifinite loop?
   }
-  print "deps: " . @deps . "\n";
   while (@blamers) {
-    print "blamers: " . @blamers . "\n";
     my @ready = grep {$_->ready($filename)} @blamers;
-    print "ready: " . @ready . "\n";
     die("ready queue empty\n") unless @ready;
     for my $blamer (@ready) {
       $blamer->blame($filename);
@@ -50,20 +47,6 @@ sub blame {
     my $ready = {map {$_ => 1} @ready};
     @blamers = grep {!$ready->{$_}} @blamers;
   }
-  my $blamedata = $self->{'storage'}->retrieve($rev, $filename);
-  print "\n###\n";
-  print "file lines: " . split('\n', BSSrcrep::repreadstr($rev->intrev(), $filename, $rev->files()->{$filename})) . "\n";
-  print "blame lines: " . scalar(@$blamedata) . "\n";
-  my $i = 0;
-  for my $rev (@$blamedata) {
-    unless ($rev) {
-      print "undef\n";
-      next;
-    }
-    my $r = $rev->intrev();
-    print "$r->{'project'}/$r->{'package'}/$r->{'rev'}\n";
-  }
-#  print $i - 1 . "\n";
 }
 
 sub resolve {
@@ -75,7 +58,6 @@ sub resolve {
     @deps = $self->resolve_expanded($rev) if $rev->isexpanded();
     @deps = $self->resolve_branch($rev) if $rev->isbranch();
     @deps = $self->resolve_plain($rev) if $rev->isplain();
-#    print Dumper(\@deps);
     die("todo: plain links\n") if $rev->islink() && !$rev->isbranch();
     push @todo, @deps;
   }
@@ -84,70 +66,79 @@ sub resolve {
 sub resolve_expanded {
   my ($self, $rev) = @_;
   my $revmgr = $rev->revmgr();
-  print "resolve expanded\n";
+  my ($projid, $packid) = ($rev->project(), $rev->package());
+  dbgprint("resolve expanded: $projid/$packid" . " (" . ($rev + 0) . ")\n");
   my @deps;
   if ($rev->localrev()) {
-    print "localrev set\n";
+    dbgprint(" localrev set\n");
     push @deps, $rev->targetrev();
     push @deps, $rev->localrev() unless $rev->localrev()->resolved();
+    $rev->resolved(1);
     return @deps;
   }
+  dbgprint(" srcmd5: " . $rev->srcmd5() . "\n");
+  dbgprint(" lsrcmd5: " . $rev->lsrcmd5() . "\n");
   my $lrev = $revmgr->find($rev->project(), $rev->package(), $rev->lsrcmd5(),
                            $rev->constraints());
   die("unable to find lrev\n") unless $lrev;
   # merge constraints and install lrev
-#  print Dumper($lrev->constraints());
   $lrev->constraints($rev->constraints());
   $rev->localrev($lrev);
   $rev->resolved(1);
   push @deps, $rev->targetrev();
   push @deps, $lrev unless $lrev->resolved();
+  dbgprint(" push " . ($rev->targetrev() + 0) . "\n");
+  dbgprint(" push " . ($lrev + 0) . "\n") unless $lrev->resolved();
   return @deps;
 }
 
 sub resolve_branch {
-  my ($self, $rev) = @_;
-  my $revmgr = $rev->revmgr();
-  print "resolve branch\n";
-  my $lprojid = $rev->project();
-  my $lpackid = $rev->package();
-  my $tprojid = $rev->targetrev()->project();
-  my $tpackid = $rev->targetrev()->package();
+  my ($self, $primarylrev) = @_;
+  my $revmgr = $primarylrev->revmgr();
+  my $lprojid = $primarylrev->project();
+  my $lpackid = $primarylrev->package();
+  my $tprojid = $primarylrev->targetrev()->project();
+  my $tpackid = $primarylrev->targetrev()->package();
   my @deps;
-  while (!$rev->resolved()) {
+  dbgprint("resolve branch: $lprojid/$lpackid\n");
+  while (!$primarylrev->resolved()) {
     # by construction of the range all local revs are branches to same target
-    my $it = $revmgr->range($rev)->iter();
+    my $it = $revmgr->range($primarylrev)->iter();
     my $tit = $revmgr->iter($tprojid, $tpackid);
-    my $prev;
+    # successor lrev
+    my $slrev;
     while (my $lrev = $it->next()) {
-      print $lrev->{'data'}->{'rev'}->{'rev'} . "\n";
+      dbgprint(" resolve rev: $lprojid/$lpackid/r" . $lrev->intrev()->{'rev'});
+      dbgprint("\n");
       my @constraints = $lrev->constraints();
-      push @constraints, $prev->constraints() if $prev;
-      print Dumper(\@constraints);
+      push @constraints, $slrev->constraints() if $slrev;
       my ($time, $idx) = ($lrev->time(), $lrev->idx());
-      push @constraints, BSBlame::Constraint->new("time <= $time");
-      push @constraints, BSBlame::Constraint->new("idx > $idx",
+      push @constraints, BSBlame::Constraint->new("time <= $time", 1);
+      push @constraints, BSBlame::Constraint->new("idx > $idx", 1,
                                                   "project = $lprojid",
                                                   "package = $lpackid");
-      # XXX: lsrcmd5? if so, targetrev
       my $blsrcmd5 = $lrev->targetrev()->lsrcmd5();
-      my $blrev = $tit->find(BSBlame::Constraint->new("lsrcmd5 = $blsrcmd5"),
+      dbgprint("              blsrcmd5: $blsrcmd5\n");
+      my $blrev = $tit->find(BSBlame::Constraint->new("lsrcmd5 = $blsrcmd5", 0,
+                                                      "project = $tprojid",
+                                                      "package = $tpackid"),
                              @constraints);
       if (!$blrev) {
-        die("unable to resolve first elm in range\n") unless $prev;
+        die("unable to resolve first elm in range\n") unless $slrev;
         # ok, let's hope that $lrev is really the start of a new range
-        print "rangesplit\n";
         $revmgr->rangesplit($lrev);
         last;
       }
-      print "base: $blrev->{'data'}->{'rev'}->{'rev'}\n";
+      dbgprint("              -> $tprojid/$tpackid/r");
+      dbgprint($blrev->intrev()->{'rev'} . "\n");
       # install blrev and merge constraints
       # (constraints are installed to blrev _and_ the targetrev)
       $lrev->targetrev()->localrev($blrev);
       $lrev->targetrev()->constraints(@constraints);
       $lrev->resolved(1);
       push @deps, $lrev->targetrev();
-      $prev = $lrev;
+      dbgprint("                push " . ($lrev->targetrev() + 0) . "\n");
+      $slrev = $lrev;
     }
   }
   return @deps;
@@ -156,22 +147,109 @@ sub resolve_branch {
 sub resolve_plain {
   my ($self, $rev) = @_;
   my $revmgr = $rev->revmgr();
-  print "resolve plain\n";
+  my ($projid, $packid) = ($rev->project(), $rev->package());
+  dbgprint("resolve plain: $projid/$packid\n");
   return () if $rev->resolved();
-  # hmm actually nothing todo, but let's resolve the whole range...
   my $lrev = $revmgr->find($rev->project(), $rev->package(), $rev->lsrcmd5(),
                            $rev->constraints());
-  die("eek\n") unless $lrev;
+  die("unable to resolve plain rev\n") unless $lrev;
   $rev->localrev($lrev);
   $rev->resolved(1);
-  my $it = $revmgr->range($rev)->iter();
-  while (my $lrev = $it->next()) {
+  my $it = $revmgr->range($lrev)->iter();
+  while ($lrev = $it->next()) {
+    dbgprint(" rev: " . $lrev->intrev()->{'rev'} . "\n");
     last if $lrev->resolved();
     $lrev->resolved(1);
   }
-  die("logic error\n") unless $rev->resolved();
-#  $rev->resolved(1);
   return ();
+}
+
+sub lastworkingautomerge {
+  my ($self, $blamer) = @_;
+  my $lrev = $blamer->{'rev'};
+  die("branch expected\n") unless $lrev->isbranch();
+  my $plrev = $blamer->deps()->[2];
+  my $rev = findlastworkingautomerge($plrev, $lrev->time(), []);
+  die("no last working automerge found\n") unless $rev;
+  die("not expanded\n") unless $rev->isexpanded();
+  dbgprint(Dumper($rev->intrev()));
+  $self->resolve($rev);
+  $blamer->lastworking($rev->targetrev());
+}
+
+# assumption: all revisions that we encounter during calls to
+# findlastworkingautomerge satisfy the following properties:
+# - either "isbranch" or "isplain" holds
+# - in case of a branch, no linkrev attribute is set (in the _link file)
+#   and no "olinkrev" parameter was used when creating the branch (and of
+#   course no manually specified _link file etc.)
+sub findlastworkingautomerge {
+  my ($lrev, $stime, $revs, @idxconstraints) = @_;
+  my $lprojid = $lrev->project();
+  my $lpackid = $lrev->package();
+  dbgprint("findcandidate: $lprojid/$lpackid/r");
+  dbgprint($lrev->intrev()->{'rev'} . "\n");
+  my $revmgr = $lrev->revmgr();
+  if ($lrev->isplain()) {
+    my $rev = $lrev;
+    for my $lrev (@$revs) {
+      $rev = $revmgr->expand($lrev, $rev);
+      return undef unless $rev;
+    }
+    return $rev;
+  }
+  die("expanded rev makes no sense\n") if $lrev->isexpanded();
+  # idx is always defined
+  my $idx = $lrev->idx();
+  die("logic error (idx undefined)\n") unless defined($idx);
+  push @idxconstraints, BSBlame::Constraint->new("idx > $idx", 1,
+                                                 "project = $lprojid",
+                                                 "package = $lpackid");
+  my $ltime = $lrev->time();
+  my @tconstraints = (
+    BSBlame::Constraint->new("time <= $stime", 0),
+    BSBlame::Constraint->new("time >= $ltime", 0)
+  );
+
+  unshift @$revs, $lrev;
+  my $tprojid = $lrev->targetrev()->project();
+  my $tpackid = $lrev->targetrev()->package();
+  my $tit = $revmgr->iter($tprojid, $tpackid, @idxconstraints, @tconstraints);
+  # successor target lrev
+  my $stlrev;
+  my $rev;
+  while ((my $tlrev = $tit->next()) && !$rev) {
+    $rev = findlastworkingautomerge($tlrev, $stlrev ? $stlrev->time() : $stime,
+                                    $revs, @idxconstraints);
+    $stlrev = $tlrev;
+  }
+
+  if (!$rev) {
+    # we tried all target revs in the time range from ltime to stime;
+    # next we try the first target rev whose commit time is strictly less
+    # than ltime (with our assumptions, this rev is supposed to be a
+    # part of lrev's baserev (note: if all commits happened at the same time,
+    # we already found a part of lrev's baserev in the previous while loop and
+    # this codepath shouldn't be reached)).
+    @tconstraints = BSBlame::Constraint->new("time < $ltime", 0);
+    $tit = $revmgr->iter($tprojid, $tpackid, @idxconstraints, @tconstraints);
+    my $tlrev = $tit->next();
+    if ($tlrev) {
+      # TODO: come up with a reasonable testcase for the case where $stlrev
+      #       is undefined
+      $stime = $stlrev->time() if $stlrev;
+      $rev = findlastworkingautomerge($tlrev, $stime, $revs, @idxconstraints);
+    }
+  }
+  shift @$revs;
+  return $rev;
+}
+
+our $DEBUG = 0;
+
+sub dbgprint {
+  my ($msg) = @_;
+  print $msg if $DEBUG;
 }
 
 1;
