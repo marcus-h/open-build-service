@@ -59,7 +59,9 @@ sub hasconflict {
 
 sub deps {
   my ($self) = @_;
-  return $self->{'deps'} || [];
+  my @deps = @{$self->{'deps'} || []};
+  push @deps, $self->{'lastworking'} if $self->{'lastworking'};
+  return \@deps;
 }
 
 sub lastworking {
@@ -82,9 +84,9 @@ sub blame {
   return $storage->retrieve($rev, $filename)
     if $storage->retrieve($rev, $filename);
   my $blamedata;
-  $blamedata = $self->blame_expanded($filename) if $rev->isexpanded();
-  $blamedata = $self->blame_branch($filename) if $rev->isbranch();
-  $blamedata = $self->blame_plain($filename) if $rev->isplain();
+  ($blamedata) = $self->blame_expanded($filename) if $rev->isexpanded();
+  ($blamedata) = $self->blame_branch($filename) if $rev->isbranch();
+  ($blamedata) = $self->blame_plain($filename) if $rev->isplain();
   die("plain link not supported\n") if $rev->islink() && !$rev->isbranch();
   die("XXX\n") unless $blamedata;
   $storage->store($rev, $filename, $blamedata);
@@ -104,20 +106,52 @@ sub blame_expanded {
 sub blame_branch {
   my ($self, $filename) = @_;
   print "blame branch\n";
-  die("TODO: conflict blame\n") if $self->hasconflict();
+  return $self->blame_branch_conflict($filename) if $self->hasconflict();
   my $storage = $self->{'storage'};
   my ($brev, $pbrev, $plrev) = @{$self->{'deps'}};
   # no predecessor => start of a branch, hence, just take the baserev's
   # blamedata (assumption: no keepcontent case branch)
   return $storage->retrieve($brev, $filename) unless $plrev;
   # calculate blame for last working expanded predecessor
-  my $pblame = $self->calcblame($filename, $plrev, $brev, $pbrev);
+  my ($pblame) = $self->calcblame($filename, $plrev, $brev, $pbrev);
   # next diff my rev against its last working expanded predecessor
   # 2-way diff: diff prev lrev
   my $lrev = $self->{'rev'};
   my $prev = $lrev->revmgr()->expand($plrev, $brev, 1);
   $storage->store($prev, $filename, $pblame);
   return $self->calcblame($filename, $prev, $lrev, $prev);
+}
+
+sub blame_branch_conflict {
+  my ($self, $filename) = @_;
+  print "blame branch conflict\n";
+  die("there is no conflict\n") unless $self->hasconflict();
+  die("no last working automerge\n") unless $self->{'lastworking'};
+  my $storage = $self->{'storage'};
+  my $lrev = $self->{'rev'};
+  my ($brev, $pbrev, $plrev) = @{$self->{'deps'}};
+  print Dumper($self->{'lastworking'}->intrev());
+  my $prev = $lrev->revmgr()->expand($plrev, $self->{'lastworking'}, 1);
+  print "ok\n";
+  my ($pblame) = $self->calcblame($filename, $plrev, $self->{'lastworking'},
+                                  $pbrev);
+  $storage->store($prev, $filename, $pblame);
+  my ($brevblamedata, $brevblame) = $self->calcblame($filename, $brev, $lrev,
+                                                     $brev);
+  my ($prevblamedata, $prevblame) = $self->calcblame($filename, $prev, $lrev,
+                                                     $prev);
+  my @blame;
+  my @blamedata;
+  for (my $i = 0; $i < @$brevblame; $i++) {
+    if ($brevblame->[$i]->[0] == $BSSrcBlame::FY) {
+      $blame[$i] = $prevblame->[$i];
+      $blamedata[$i] = $prevblamedata->[$i];
+    } else {
+      $blame[$i] = $brevblame->[$i];
+      $blamedata[$i] = $brevblamedata->[$i];
+    }
+  }
+  return (\@blamedata, \@blame);
 }
 
 sub blame_plain {
@@ -146,7 +180,6 @@ sub calcblame {
                                $yourrev->file($filename) || '/dev/null',
                                $commonrev->file($filename) || '/dev/null',
                                scalar(@{$blames[2]}) - 1);
-#    print Dumper(\@blame);
   } elsif (!$myrev && $yourrev && !$commonrev) {
     @blame = BSSrcBlame::merge('/dev/null',
                                $yourrev->file($filename) || '/dev/null',
@@ -154,12 +187,10 @@ sub calcblame {
   } else {
     die("calcblame: illegal argument combination\n");
   }
-  # indicates that the file was removed (see also t/01-blame.t)
-  @blame = () if @blame == 1 && $blame[0]->[1] == -1;
-#  die("blame conflict (logic error)\n") unless defined($blame);
-  return [
-    map {$blames[$_->[0]] ? $blames[$_->[0]]->[$_->[1]] : $yourrev} @blame
-  ];
+  return (
+    [map {$blames[$_->[0]] ? $blames[$_->[0]]->[$_->[1]] : $yourrev} @blame],
+    \@blame
+  );
 }
 
 1;
