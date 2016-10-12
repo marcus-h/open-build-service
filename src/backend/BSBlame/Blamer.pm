@@ -95,7 +95,6 @@ sub blame {
 
 sub blame_expanded {
   my ($self, $filename) = @_;
-  print "blame expanded\n";
   my $rev = $self->{'rev'};
   my $lrev = $rev->localrev();
   my $trev = $rev->targetrev();
@@ -105,7 +104,6 @@ sub blame_expanded {
 
 sub blame_branch {
   my ($self, $filename) = @_;
-  print "blame branch\n";
   return $self->blame_branch_conflict($filename) if $self->hasconflict();
   my $storage = $self->{'storage'};
   my ($brev, $pbrev, $plrev) = @{$self->{'deps'}};
@@ -124,15 +122,12 @@ sub blame_branch {
 
 sub blame_branch_conflict {
   my ($self, $filename) = @_;
-  print "blame branch conflict\n";
   die("there is no conflict\n") unless $self->hasconflict();
   die("no last working automerge\n") unless $self->{'lastworking'};
   my $storage = $self->{'storage'};
   my $lrev = $self->{'rev'};
   my ($brev, $pbrev, $plrev) = @{$self->{'deps'}};
-  print Dumper($self->{'lastworking'}->intrev());
   my $prev = $lrev->revmgr()->expand($plrev, $self->{'lastworking'}, 1);
-  print "ok\n";
   my ($pblame) = $self->calcblame($filename, $plrev, $self->{'lastworking'},
                                   $pbrev);
   $storage->store($prev, $filename, $pblame);
@@ -156,11 +151,9 @@ sub blame_branch_conflict {
 
 sub blame_plain {
   my ($self, $filename) = @_;
-  print "blame plain\n";
   my $lrev = $self->{'rev'};
   # if lrev is the first rev in the range, plrev is undefined
   my $plrev = $self->{'deps'}->[0];
-  print "plrev: " . ($plrev ? $plrev->intrev()->{'rev'} : 'undef') . "\n";
   # 2-way diff of myrev against its predecessor
   return $self->calcblame($filename, $plrev, $lrev, $plrev);
 }

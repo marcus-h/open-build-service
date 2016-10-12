@@ -206,7 +206,6 @@ sub cookie {
   if ($self->isexpanded()) {
     $cookie .= "\n" . $self->targetrev()->cookie();
   }
-  print Dumper($cookie);
   $self->{'data'}->{'cookie'} = Digest::MD5::md5_hex($cookie);
   return $self->{'data'}->{'cookie'};
 }
