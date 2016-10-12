@@ -63,6 +63,11 @@ use BSSrcServer::Remote;
 use BSSrcServer::Partition;
 use BSSrcServer::Access;
 
+use BSBlame::BlameStorage;
+use BSBlame::Revision;
+use BSBlame::RevisionManager;
+use BSBlame::RangeFirstStrategy;
+
 use BSXPath;
 use BSXPathKeys;
 use BSDB;
@@ -4205,6 +4210,27 @@ sub servicediff {
   }
 }
 
+sub sourceblame {
+  my ($cgi, $projid, $packid, $filename) = @_;
+  my $rev = getrev($projid, $packid, $cgi->{'rev'});
+  my $files = BSSrcrep::lsrev($rev);
+  my %lrev = %$rev;
+  $files = handlelinks(\%lrev, $files) if $cgi->{'expand'};
+  die("404 filename $filename does not exist\n") unless $files->{$filename};
+  my $revmgr = BSBlame::RevisionManager->new($projectsdir, $srcrevlay,
+                                             \&getrev,\&BSSrcrep::lsrev,
+                                             \&BSSrcrep::repfilename,
+                                             \&handlelinks);
+  $rev = BSBlame::Revision->new(\%lrev, $revmgr);
+  my $storage =  BSBlame::BlameStorage->new();
+  my $strategy = BSBlame::RangeFirstStrategy->new($storage);
+  $strategy->blame($rev, $filename);
+  my $blamedata = $storage->retrieve($rev, $filename);
+  die("no blamedata available\n") unless $blamedata;
+  my @blamedata = map {$_->intrev()} @$blamedata;
+  return ({'revision' => \@blamedata}, $BSXML::blamedata);
+}
+
 sub isascii {
   my ($file) = @_;
   return 0 if $file =~ /\.obscpio$/;
@@ -7327,6 +7353,7 @@ my $dispatches = [
   'POST:/source/$project/$package cmd=mergeservice user:? comment:?' => \&mergeservicerun,
   'POST:/source/$project/$package cmd=getprojectservices' => \&getprojectservices,
   'POST:/source/$project/$package cmd=notifypackagechange' => \&notifypackagechange,
+  'POST:/source/$project/$package/$filename cmd=blame rev? expand:bool?' => \&sourceblame,
   'POST:/source/$project/$package cmd: *:*' => \&unknowncmd,
 
   'PUT:/source/$project/$package cmd: rev? user:? comment:?' => \&sourcecommitfilelist,	# obsolete
