@@ -7,6 +7,8 @@ use Data::Dumper;
 
 use BSSrcBlame;
 
+# Performs the actual blame of a revision.
+
 sub new {
   my ($class, $rev, $storage) = @_;
   my $self = {'rev' => $rev, 'storage' => $storage};

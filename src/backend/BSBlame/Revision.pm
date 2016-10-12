@@ -10,6 +10,65 @@ use BSSrcrep;
 use BSRevision;
 use BSXML;
 
+# This code needs a bit more love (get rid of this stupid $self->{'data'}
+# indirection etc.)
+
+# This class represents a revision. A revision object will be associated to
+# a corresponding local revision (localrev), which is also a revision object.
+# The association is done in BSBlame::RangeFirstStrategy::resolve.
+# A local revision is a revision object that corresponds to a certain commit,
+# which is tracked in a $projid.pkg/$packid.rev file.
+#
+# Currently, we support three types of revisions:
+#
+# 1. Plain Revision
+# A plain revision is a BSBlame::Revision object that corresponds to a package
+# that has no _link file. From a conceptual point of view, a plain
+# BSBlame::Revision $rev can either be a _local revision_ itself or "normal"
+# plain revision object that has to be associated to a correponding plain
+# _local revision_ BSBlame::Revision object. For instance, all
+# BSBlame::Revision objects that are created in BSBlame::Revision::init can
+# be interpreted as a "normal" plain revision.
+# Note: from a code POV, there is no difference between a plain local revision
+#       and "normal" plain revision.
+#
+# 2. Expanded Revision
+# An expanded obs revision refers to two other obs revisions: the local
+# revision (lsrcmd5) (/LOCAL) and the link revision (srcmd5) (/LINK).
+# The lsrcmd5, which contains the _link file, corresponds to one or more
+# commits in the $projid.pkg/$packid.rev. The srcmd5 corresponds to a
+# plain rev or an expanded rev of the link target.
+# Both concepts are mapped to a BSBlame::Revision object $rev as follows:
+#
+# - lsrcmd5 -> $rev->localrev()
+# - srcmd5  -> $rev->targetrev()
+#
+# (Note: $rev->localrev() can only be accessed once $rev is resolved
+#        (otherwise undef is returned))
+#
+# Keep in mind that a lsrcmd5 might correspond to more commits and, hence,
+# it might be possible that an expanded revision is associated to a
+# "wrong" local revision.
+#
+# 3. Branch Revision
+# A branch revision _is_ a _local revision_ whose file set contains a _link
+# file that represents an obs branch. The _link's baserev is either a plain
+# rev or an expanded rev of the link target. This is mapped to a
+# BSBlame::Revision object $lrev as follows:
+#
+# - $lrev -> $lrev->localrev() (remember that a branch revision _is_ a local
+#                               revision => $lrev->localrev() returns itself)
+# - baserev -> $lrev->targetrev()
+
+
+# Variable naming conventions:
+#
+# $lrev:  local revision
+# $plrev: preceeding local revision (e.g., $plrev->idx() == $lrev->idx() + 1)
+# $slrev: succeeding local revision (e.g., $slrev->idx() == $lrev->idx() - 1)
+# $tlrev: target local revision
+# $rev:   expanded revision or a normal plain revision
+
 sub new {
   my ($class, $rev, $revmgr, $idx) = @_;
   return bless {
@@ -120,12 +179,10 @@ sub localrev {
   $self->init();
   my $data = $self->{'data'};
   if ($lrev) {
-#    die("localrev cannot be set for a plain rev\n") if $self->isplain();
     die("localrev cannot be changed\n") if $data->{'localrev'}
       && $data->{'localrev'} != $lrev; # XXX: use ref comparison
     $data->{'localrev'} = $lrev;
   }
-#  return $self if $self->isplain();
   return $self if $self->resolved() && !$data->{'localrev'};
   return $data->{'localrev'};
 }
@@ -174,6 +231,8 @@ sub satisfies {
 
 sub constraints {
   my ($self, @constraints) = @_;
+  # TODO: instead of just pushing the @constraints, it would be more
+  #       reasonable to "merge" the constraints
   my $data = $self->{'data'};
   push @{$data->{'constraints'}}, @constraints;
   $data->{'targetrev'}->constraints(@constraints) if $data->{'targetrev'};

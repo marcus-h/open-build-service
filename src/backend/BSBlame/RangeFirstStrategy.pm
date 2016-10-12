@@ -5,9 +5,6 @@ use warnings;
 
 use Data::Dumper;
 
-# XXX: remove
-use BSSrcrep;
-
 use BSBlame::Blamer;
 use BSBlame::Constraint;
 use BSBlame::Revision;
@@ -49,6 +46,15 @@ sub blame {
   }
 }
 
+# The goal of this step is to associate $rev and all its deps to a
+# corresponding localrev (cf. BSBlame::Revision for a localrev
+# "definition").
+# Note: this is just a heuristic that can "easily" fooled:
+# - play with different commit times (affects only branches)
+# - play with the "olinkrev" parameter when creating branches
+# - manually specified _links
+# - etc.
+# TODO: create testcases for these scenarios
 sub resolve {
   my ($self, $rev) = @_;
   my @todo = $rev;

@@ -8,6 +8,17 @@ use Data::Dumper;
 use BSBlame::Constraint;
 use BSBlame::Iterator;
 
+# A range is a contiguous ordered set of _local revision_ objects that refer
+# to the same $projid/$packid and have the same type (possible types: plain
+# revision or branch revision (see docs of BSBlame::Revision)).
+# For a range that contains branch revisions the following property holds:
+# - all branch revisions in this range have the same target (target project
+#   and target package)
+#
+# Note: it is possible that during the resolve step (see
+#       BSBlame::RangeFirstStrategy::resolve) an existing range is split into
+#       two different ranges.
+
 sub new {
   my ($class, $start, $data) = @_;
   return bless {
@@ -29,8 +40,6 @@ sub end {
 sub contains {
   my ($self, $lrev) = @_;
   die("illegal rev\n") if !defined($lrev) || $lrev->isexpanded();
-#  print $rev->{'data'}->{'rev'}->{'rev'} . "\n";
-#  print $rev->idx() . "\n";
   return 0 unless $lrev->idx() >= $self->{'start'};
   return 0 unless !defined($self->{'end'}) || $lrev->idx() <= $self->{'end'};
   # representant of the whole range

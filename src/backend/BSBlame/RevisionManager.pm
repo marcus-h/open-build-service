@@ -11,6 +11,9 @@ use BSBlame::Range;
 use BSBlame::Constraint;
 use BSBlame::Iterator;
 
+# Manages local revision objects and ranges. Moreover, it encapsulates the
+# access to source files etc.
+
 sub new {
   my ($class, $projectsdir, $srcrevlay, $getrev, $lsrev, $repfilename,
       $expand) = @_;
