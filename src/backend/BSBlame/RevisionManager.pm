@@ -100,7 +100,7 @@ sub iter {
 
 sub find {
   my ($self, $projid, $packid, $lsrcmd5, @constraints) = @_;
-  push @constraints, BSBlame::Constraint->new("lsrcmd5 = $lsrcmd5",
+  push @constraints, BSBlame::Constraint->new("lsrcmd5 = $lsrcmd5", 0,
                                               "project = $projid",
                                               "package = $packid");
   my $it = $self->iter($projid, $packid, @constraints);
@@ -113,8 +113,8 @@ sub range {
   # XXX: revs needed/just the read?
   my $revs = $self->read($lrev->project(), $lrev->package());
   die("$key not known\n") unless $self->{'ranges'}->{$key};
-  for (@{$self->{'ranges'}->{$key}}) {
-    return $_ if $_->contains($lrev);
+  for my $range (@{$self->{'ranges'}->{$key}}) {
+    return $range if $range->contains($lrev);
   }
   # we could print more details, but this code path shouldn't be
   # reached in the first place...
