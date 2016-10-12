@@ -73,9 +73,7 @@ sub expand {
   my $lfiles = $lrev->files();
   my %lrev = %{$lrev->intrev()};
   $lrev{'linkrev'} = $trev->srcmd5();
-#  print Dumper($lfiles);
   my $files = $self->{'expand'}->(\%lrev, $lfiles);
-#  print Dumper($files);
   if (!ref($files)) {
     die("cannot be expanded\n") if $fatal;
     return undef;
@@ -110,8 +108,7 @@ sub find {
 sub range {
   my ($self, $lrev) = @_;
   my $key = $lrev->project() . '/' . $lrev->package();
-  # XXX: revs needed/just the read?
-  my $revs = $self->read($lrev->project(), $lrev->package());
+  $self->read($lrev->project(), $lrev->package());
   die("$key not known\n") unless $self->{'ranges'}->{$key};
   for my $range (@{$self->{'ranges'}->{$key}}) {
     return $range if $range->contains($lrev);
