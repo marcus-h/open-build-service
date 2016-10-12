@@ -17,11 +17,14 @@ my $opre = join('|',
                 map {"\Q$_\E"} sort {length($b) <=> length($a)} keys(%$opmap));
 
 sub new {
-  my ($class, $expr, @preexprs) = @_;
+  my ($class, $expr, $global, @preexprs) = @_;
   my $self = {};
   bless $self, $class;
   $self->parse($expr);
-  push @{$self->{'preconditions'}}, BSBlame::Constraint->new($_) for @preexprs;
+  $self->{'global'} = $global;
+  for my $preexpr (@preexprs) {
+    push @{$self->{'preconditions'}}, BSBlame::Constraint->new($preexpr);
+  }
   return $self;
 }
 
@@ -43,10 +46,15 @@ sub eval {
 
 sub isfor {
   my ($self, $rev) = @_;
-  for (@{$self->{'preconditions'} || []}) {
-    return 0 if !$_->eval($rev);
+  for my $precondition (@{$self->{'preconditions'} || []}) {
+    return 0 if !$precondition->eval($rev);
   }
   return 1;
+}
+
+sub isglobal {
+  my ($self) = @_;
+  return $self->{'global'};
 }
 
 # needed? (only for constraint merging, contradiction checking etc.)
