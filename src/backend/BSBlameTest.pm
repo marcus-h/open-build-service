@@ -118,6 +118,8 @@ sub putpackage {
 
 # make sure projid or projid/packid exist
 # returns true if projid or projid/packid already exists
+# XXX: we always delete $packid, (for the current use cases this is
+#      the more "reasonable" behavior)
 sub create {
   my ($projid, $packid, @query) = @_;
   my $exists;
@@ -130,13 +132,15 @@ sub create {
     putproject($projid, @query);
   }
   return defined($exists) unless $packid;
+  $exists = undef;
   eval {
     $exists = list($projid, $packid);
   };
   if ($@) {
     die($@) unless $@ =~ /^404/;
-    putpackage($projid, $packid, @query);
   }
+  del($projid, $packid) if $exists;
+  putpackage($projid, $packid, @query);
   return defined($exists);
 }
 
