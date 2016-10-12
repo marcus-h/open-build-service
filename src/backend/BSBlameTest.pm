@@ -16,12 +16,13 @@ require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(blame_is list_like commit branch create del list);
 
-## test helpers
+# Some testing infrastructure code...
 
 sub blame_is {
   my ($test_name, $projid, $packid, $filename, %opts) = @_;
   my $code = delete $opts{'code'} || 200;
-  die("'expected' option required\n") unless exists $opts{'expected'} || $code != 200;
+  die("'expected' option required\n")
+    unless exists $opts{'expected'} || $code != 200;
   my $exp = delete $opts{'expected'};
   $exp .= 'NUMLINES: ' . split("\n", $exp) if $exp;
   # by default, we always expand
@@ -64,7 +65,8 @@ sub list_like {
 sub rpc {
   my ($uri, @args) = @_;
   $uri = {'uri' => $uri} unless ref($uri) eq 'HASH';
-  push @{$uri->{'headers'}}, "User-Agent: BSBlameTest" unless grep { /'^User-Agent:'/si } @{$uri->{'headers'} || []};
+  push @{$uri->{'headers'}}, "User-Agent: BSBlameTest"
+    unless grep { /'^User-Agent:'/si } @{$uri->{'headers'} || []};
   return BSRPC::rpc($uri, @args);
 }
 
@@ -78,7 +80,8 @@ sub list {
 
 sub getfile {
   my ($projid, $packid, $filename, %opts) = @_;
-  return rpc("$BSConfig::srcserver/source/$projid/$packid/$filename", undef, hash2query(%opts));
+  return rpc("$BSConfig::srcserver/source/$projid/$packid/$filename", undef,
+             hash2query(%opts));
 }
 
 sub putdata {
@@ -108,12 +111,13 @@ sub putproject {
 sub putpackage {
   my ($projid, $packid, @query) = @_;
   my $uri = "$BSConfig::srcserver/source/$projid/$packid/_meta";
-  my $data = BSUtil::toxml({'project' => $projid, 'name' => $packid}, $BSXML::pack);
+  my $data = BSUtil::toxml({'project' => $projid, 'name' => $packid},
+                           $BSXML::pack);
   return putdata($uri, $BSXML::pack, $data, @query);
 }
 
 # make sure projid or projid/packid exist
-# returns true if projid or projid/packid already exist
+# returns true if projid or projid/packid already exists
 sub create {
   my ($projid, $packid, @query) = @_;
   my $exists;
@@ -170,13 +174,15 @@ sub commit {
   my $ofiles;
   $ofiles = list($projid, $packid, "rev=$orev", "expand=1") unless $newcontent;
   my @entries = @{$ofiles->{'entry'} || []};
-  @entries = grep { !exists($files{$_->{'name'}}) } @entries;
+  @entries = grep {!exists($files{$_->{'name'}})} @entries;
   # only name and md5 attrs, please (the others don't harm, though)
   for my $e (@entries) {
-    delete $e->{$_} for grep { $_ ne "name" && $_ ne "md5" } keys %$e;
+    delete $e->{$_} for grep {$_ ne "name" && $_ ne "md5"} keys %$e;
   }
-  delete $files{$_} for grep { !$files{$_} } keys %files;
-  push @entries, {'name' => $_, 'md5' => Digest::MD5::md5_hex($files{$_})} for keys %files;
+  delete $files{$_} for grep {!$files{$_}} keys %files;
+  for my $f (keys %files) {
+    push @entries, {'name' => $f, 'md5' => Digest::MD5::md5_hex($files{$f})};
+  }
   my $todo = commitfilelist($projid, $packid, \@entries, hash2query(%$opts));
   if ($todo->{'error'}) {
     die("unexpected error: $todo->{'error'}\n") unless $todo->{'error'} eq 'missing';
@@ -187,7 +193,6 @@ sub commit {
     $todo = commitfilelist($projid, $packid, \@entries, hash2query(%$opts));
     die("cannot commit files: $todo->{'error'}\n") if $todo->{'error'};
   }
-#  print Dumper($todo);
   return $todo;
 }
 
