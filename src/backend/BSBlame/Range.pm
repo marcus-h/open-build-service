@@ -67,9 +67,10 @@ sub iter {
   # hmm introduce special constraints such that we can pass
   # start and end as a reference (so that the iterator is consistent
   # after a range split)
+  # TODO: testcase that demonstrates why we need non-global constraints here
   return BSBlame::Iterator->new($self->{'data'},
-                                BSBlame::Constraint->new("idx >= $start"),
-                                BSBlame::Constraint->new("idx <= $end"));
+                                BSBlame::Constraint->new("idx >= $start", 0),
+                                BSBlame::Constraint->new("idx <= $end", 0));
 }
 
 1;
