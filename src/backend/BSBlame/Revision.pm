@@ -12,7 +12,6 @@ use BSXML;
 
 sub new {
   my ($class, $rev, $revmgr, $idx) = @_;
-  print "BSBlame::Revision::new\n";
   return bless {
     'data' => {
       'rev' => $rev,
@@ -107,7 +106,12 @@ sub srcmd5 {
 
 sub time {
   my ($self) = @_;
-  die("time cannot be requested for an expanded rev\n") if $self->isexpanded();
+  if ($self->isexpanded()) {
+    my $lrev = $self->localrev();
+    # lrev itself is not necessarily resolved
+    return $lrev->time() if $self->resolved();
+    die("time cannot be requested for an expanded rev\n");
+  }
   return $self->{'data'}->{'rev'}->{'time'};
 }
 
@@ -155,14 +159,15 @@ sub idx {
 
 sub satisfies {
   my ($self, @constraints) = @_;
-  for (@constraints) {
-    next unless $_->isfor($self);
-    return 0 unless $_->eval($self);
+  for my $c (@constraints) {
+    next unless $c->isfor($self);
+    return 0 unless $c->eval($self);
   }
-  # only init if really needed
   $self->init();
   if ($self->resolved() && ($self->islink() || $self->isexpanded())) {
-    return $self->targetrev()->satisfies(@constraints);
+    @constraints = grep {$_->isglobal()} @constraints;
+    my $trev = $self->targetrev();
+    return $trev->satisfies(@constraints) if $trev->resolved();
   }
   return 1;
 }
